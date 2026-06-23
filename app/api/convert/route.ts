@@ -3,31 +3,32 @@ import pdf from "pdf-parse";
 import OpenAI from "openai";
 
 export async function POST(req: Request) {
-  const data = await req.formData();
-  const file = data.get("file") as File;
+  const formData = await req.formData();
+  const file = formData.get("file") as File;
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const pdfData = await pdf(buffer);
+  if (!file) {
+    return NextResponse.json({ error: "No file" }, { status: 400 });
+  }
 
-  const client = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  // PDF → テキスト抽出
+  const data = await pdf(buffer);
+  const text = data.text;
+
+  // OpenAI 要約
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+  const completion = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: "PDF の内容を要約してください。" },
+      { role: "user", content: text },
+    ],
   });
 
-  const prompt = `
-あなたはPDFを読みやすいWeb記事に変換するAIです。
-以下のPDF内容を元に、見出し・段落・箇条書きを使って
-読みやすいHTML記事を生成してください。
-
-PDF内容:
-${pdfData.text}
-`;
-
-  const completion = await client.responses.create({
-    model: "gpt-4.1",
-    input: prompt,
+  return NextResponse.json({
+    text: completion.choices[0].message.content,
   });
-
-  const html = completion.output_text;
-
-  return NextResponse.json({ html });
 }

@@ -1,33 +1,42 @@
 "use client";
+
 import { useState } from "react";
 
 export default function UploadPage() {
+  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function handleUpload(e) {
-    e.preventDefault();
+  const handleUpload = async () => {
+    if (!file) return;
+
     setLoading(true);
 
-    const form = new FormData(e.target);
+    const formData = new FormData();
+    formData.append("file", file);
+
     const res = await fetch("/api/convert", {
       method: "POST",
-      body: form,
+      body: formData,
     });
 
     const data = await res.json();
-    localStorage.setItem("converted", data.html);
-    window.location.href = "/result";
-  }
+    setLoading(false);
+
+    // 結果ページへ
+    window.location.href = `/result?text=${encodeURIComponent(data.text)}`;
+  };
 
   return (
-    <div>
-      <h1>PDF → AI記事化ツール</h1>
-      <form onSubmit={handleUpload}>
-        <input type="file" name="file" accept="application/pdf" required />
-        <button type="submit" disabled={loading}>
-          {loading ? "変換中..." : "変換する"}
-        </button>
-      </form>
-    </div>
+    <main>
+      <h1>PDF アップロード</h1>
+      <input
+        type="file"
+        accept="application/pdf"
+        onChange={(e) => setFile(e.target.files?.[0] || null)}
+      />
+      <button onClick={handleUpload} disabled={loading}>
+        {loading ? "変換中…" : "変換する"}
+      </button>
+    </main>
   );
 }
