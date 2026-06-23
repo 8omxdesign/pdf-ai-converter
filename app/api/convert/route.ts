@@ -1,4 +1,3 @@
-export const runtime = "edge";
 import { NextResponse } from "next/server";
 import pdf from "pdf-parse";
 import OpenAI from "openai";
