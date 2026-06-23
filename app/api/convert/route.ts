@@ -1,34 +1,34 @@
-import { NextResponse } from "next/server";
-import pdf from "pdf-parse";
-import OpenAI from "openai";
+import pdfParse from "pdf-parse";
 
 export async function POST(req: Request) {
-  const formData = await req.formData();
-  const file = formData.get("file") as File;
+  try {
+    // フォームデータを取得
+    const formData = await req.formData();
+    const file = formData.get("file") as File | null;
 
-  if (!file) {
-    return NextResponse.json({ error: "No file" }, { status: 400 });
+    if (!file) {
+      return new Response(
+        JSON.stringify({ error: "No file received" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // ArrayBuffer → Buffer に変換（pdf-parse は Buffer 必須）
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // PDF を解析
+    const data = await pdfParse(buffer);
+
+    return new Response(
+      JSON.stringify({ text: data.text }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+
+  } catch (err: any) {
+    return new Response(
+      JSON.stringify({ error: err.message || String(err) }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   }
-
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-
-  // PDF → テキスト抽出
-  const data = await pdf(buffer);
-  const text = data.text;
-
-  // OpenAI 要約
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-  const completion = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: "PDF の内容を要約してください。" },
-      { role: "user", content: text },
-    ],
-  });
-
-  return NextResponse.json({
-    text: completion.choices[0].message.content,
-  });
 }
